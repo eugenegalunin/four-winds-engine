@@ -107,42 +107,35 @@ namespace SWE
         std::lock_guard<std::mutex> lock(logLock);
         __android_log_print(ANDROID_LOG_INFO, logId.c_str(), "%s", os.str().c_str());
     }
-#elif defined(__MINGW32__)
+#else
     namespace
     {
-        static std::ofstream logFle;
+        static std::ofstream logFile;
     }
 
     void LogWrapper::init(const std::string & app, const char* arg0)
     {
-        logId = arg0 ?
-             Systems::concatePath(Systems::dirname(arg0), app).append(".txt") :
-             std::string(app).append(".txt");
+        const std::string directory = Systems::homeDirectory(app);
+        if(!directory.empty() && !Systems::isDirectory(directory))
+            Systems::makeDirectory(directory);
+
+        logId = directory.empty() ? std::string(app).append(".log") :
+            Systems::concatePath(directory, std::string(app).append(".log"));
         logFile.open(logId.c_str(), std::fstream::app);
 
         if(! logFile.is_open())
             std::cerr << "error open file: " << logId << std::endl;
-    }
-
-    LogWrapper::~LogWrapper()
-    {
-        std::lock_guard<std::mutex> lock(logLock);
-
-        if(osfile.is_open())
-            osfile << os.str();
         else
-            std::clog << os.str();
-    }
-#else
-    void LogWrapper::init(const std::string & app, const char* arg0)
-    {
-        logId = app;
+            logFile << "\n" << String::time() << ": [SESSION START]\n" << std::flush;
     }
 
     LogWrapper::~LogWrapper()
     {
         std::lock_guard<std::mutex> lock(logLock);
-        std::clog << os.str();
+        const std::string message = os.str();
+
+        std::clog << message << std::flush;
+        if(logFile.is_open()) logFile << message << std::flush;
     }
 #endif
 

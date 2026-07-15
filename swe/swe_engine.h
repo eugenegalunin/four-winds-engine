@@ -23,6 +23,8 @@
 #ifndef _SWE_ENGINE_
 #define _SWE_ENGINE_
 
+#include <string>
+
 #define SWE_VERSION 20220412
 
 /// @brief пространство SWE
@@ -40,7 +42,18 @@ namespace SWE
         void		except(const char* func, const char* message);
 
 	/// @private
-        class           exception {};
+	class exception
+	{
+	    std::string functionName;
+	    std::string errorMessage;
+
+	public:
+	    exception(const char* function, const char* message)
+		: functionName(function ? function : ""), errorMessage(message ? message : "") {}
+
+	    const std::string & function(void) const { return functionName; }
+	    const std::string & message(void) const { return errorMessage; }
+	};
     } // Engine
 
 } // SWE

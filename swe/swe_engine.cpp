@@ -21,6 +21,11 @@
  ***************************************************************************/
 
 #include <ctime>
+#include <cstdlib>
+
+#if (defined(__APPLE__) || defined(__linux__)) && !defined(BOOST_STACKTRACE_USE_ADDR2LINE)
+#include <execinfo.h>
+#endif
 
 #include "swe_engine.h"
 #include "swe_events.h"
@@ -48,6 +53,27 @@ namespace SWE
 #include "boost/stacktrace.hpp"
 #endif
 
+#if (defined(__APPLE__) || defined(__linux__)) && !defined(BOOST_STACKTRACE_USE_ADDR2LINE)
+namespace
+{
+void logNativeStackTrace(void)
+{
+    void* frames[64] = {};
+    const int count = ::backtrace(frames, 64);
+    char** symbols = 0 < count ? ::backtrace_symbols(frames, count) : nullptr;
+
+    SWE::LogWrapper log;
+    log << SWE::String::time() << ": [STACK TRACE]\n";
+    if(symbols)
+    {
+        for(int index = 0; index < count; ++index)
+            log << symbols[index] << '\n';
+        std::free(symbols);
+    }
+}
+}
+#endif
+
 void SWE::Engine::except(const char* func, const char* message)
 {
     if(func && message) COUT(String::time() << ": [EXCEPTION]\t" << func << ":  " << message);
@@ -57,11 +83,14 @@ void SWE::Engine::except(const char* func, const char* message)
     if(!message || strcmp(message, "SDL_QUIT"))
         LogWrapper() << boost::stacktrace::stacktrace();
 
+#elif defined(__APPLE__) || defined(__linux__)
+    if(!message || strcmp(message, "SDL_QUIT"))
+        logNativeStackTrace();
 #endif
 #ifdef ANDROID
     exit(0);
 #else
-    throw exception();
+    throw exception(func, message);
 #endif
 }
 
