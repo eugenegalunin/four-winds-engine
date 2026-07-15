@@ -24,6 +24,7 @@
 #include <sstream>
 #include <fstream>
 #include <iostream>
+#include <cerrno>
 #include <cctype>
 #include <cstdlib>
 #include <clocale>
@@ -180,12 +181,15 @@ namespace SWE
         ret = mkdir(path.c_str(), S_IRWXU);
 #endif
 
-        if(ret == EEXIST)
-            return true;
+        if(ret != 0 && errno == EEXIST)
+        {
+            struct stat fs;
+            return stat(path.c_str(), &fs) == 0 && S_ISDIR(fs.st_mode);
+        }
 
-        if(ret != 0)
+	if(ret != 0)
 	{
-            ERROR("mkdir failed, error: " << ret << ", dir: " << path);
+	    ERROR("mkdir failed, errno: " << errno << ", dir: " << path);
 	}
 	else
 	if(mode)
