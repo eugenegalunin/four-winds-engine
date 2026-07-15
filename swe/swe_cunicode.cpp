@@ -22,18 +22,59 @@
 
 #include <ctime>
 #include <cctype>
-#include <locale>
+#include <cstdint>
 #include <cstring>
 #include <sstream>
 #include <iomanip>
 #include <numeric>
-#include <codecvt>
 #include <algorithm>
 
 #include "swe_tools.h"
 #include "swe_systems.h"
 #include "swe_fontset.h"
 #include "swe_cunicode.h"
+
+namespace
+{
+    constexpr char16_t ReplacementCharacter = 0xFFFD;
+
+    void appendUtf16(std::u16string & result, uint32_t codepoint)
+    {
+        if(codepoint <= 0xFFFF)
+        {
+            result.push_back(static_cast<char16_t>(codepoint));
+            return;
+        }
+
+        codepoint -= 0x10000;
+        result.push_back(static_cast<char16_t>(0xD800 + (codepoint >> 10)));
+        result.push_back(static_cast<char16_t>(0xDC00 + (codepoint & 0x3FF)));
+    }
+
+    void appendUtf8(std::string & result, uint32_t codepoint)
+    {
+        if(codepoint <= 0x7F)
+            result.push_back(static_cast<char>(codepoint));
+        else if(codepoint <= 0x7FF)
+        {
+            result.push_back(static_cast<char>(0xC0 | (codepoint >> 6)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+        else if(codepoint <= 0xFFFF)
+        {
+            result.push_back(static_cast<char>(0xE0 | (codepoint >> 12)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+        else
+        {
+            result.push_back(static_cast<char>(0xF0 | (codepoint >> 18)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 12) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | ((codepoint >> 6) & 0x3F)));
+            result.push_back(static_cast<char>(0x80 | (codepoint & 0x3F)));
+        }
+    }
+}
 
 namespace SWE
 {
@@ -100,14 +141,83 @@ namespace SWE
 
     std::u16string UnicodeString::utf8_to_utf16(const std::string & utf8)
     {
-        std::wstring_convert<std::codecvt_utf8<char16_t>,char16_t> conv;
-        return conv.from_bytes(utf8);
+        std::u16string result;
+        result.reserve(utf8.size());
+
+        for(size_t offset = 0; offset < utf8.size();)
+        {
+            const auto first = static_cast<unsigned char>(utf8[offset]);
+            uint32_t codepoint = 0;
+            size_t length = 0;
+
+            if(first <= 0x7F)
+            {
+                codepoint = first;
+                length = 1;
+            }
+            else if((first & 0xE0) == 0xC0)
+            {
+                codepoint = first & 0x1F;
+                length = 2;
+            }
+            else if((first & 0xF0) == 0xE0)
+            {
+                codepoint = first & 0x0F;
+                length = 3;
+            }
+            else if((first & 0xF8) == 0xF0)
+            {
+                codepoint = first & 0x07;
+                length = 4;
+            }
+
+            bool valid = length && offset + length <= utf8.size();
+            for(size_t index = 1; valid && index < length; ++index)
+            {
+                const auto continuation = static_cast<unsigned char>(utf8[offset + index]);
+                valid = (continuation & 0xC0) == 0x80;
+                if(valid) codepoint = (codepoint << 6) | (continuation & 0x3F);
+            }
+
+            const uint32_t minimum = length == 2 ? 0x80 : length == 3 ? 0x800 : length == 4 ? 0x10000 : 0;
+            valid = valid && codepoint >= minimum && codepoint <= 0x10FFFF &&
+                    !(0xD800 <= codepoint && codepoint <= 0xDFFF);
+            if(!valid)
+            {
+                result.push_back(ReplacementCharacter);
+                ++offset;
+                continue;
+            }
+
+            appendUtf16(result, codepoint);
+            offset += length;
+        }
+
+        return result;
     }
 
     std::string UnicodeString::utf16_to_utf8(const std::u16string & utf16)
     {
-        std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t> conv;
-        return conv.to_bytes(utf16);
+        std::string result;
+        result.reserve(utf16.size());
+
+        for(size_t offset = 0; offset < utf16.size(); ++offset)
+        {
+            uint32_t codepoint = utf16[offset];
+            if(0xD800 <= codepoint && codepoint <= 0xDBFF)
+            {
+                if(offset + 1 < utf16.size() && 0xDC00 <= utf16[offset + 1] && utf16[offset + 1] <= 0xDFFF)
+                    codepoint = 0x10000 + ((codepoint - 0xD800) << 10) + (utf16[++offset] - 0xDC00);
+                else
+                    codepoint = ReplacementCharacter;
+            }
+            else if(0xDC00 <= codepoint && codepoint <= 0xDFFF)
+                codepoint = ReplacementCharacter;
+
+            appendUtf8(result, codepoint);
+        }
+
+        return result;
     }
 
     void UnicodeString::assign(const std::string & utf8)

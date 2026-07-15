@@ -33,11 +33,53 @@ include_directories(.)
 
 if(SWE_SHARED)
     add_library(libswe SHARED)
-    set_target_properties(libswe PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 else()
     add_library(libswe STATIC)
-    set_target_properties(libswe PROPERTIES ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR})
 endif()
+
+target_include_directories(libswe PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}
+    ${SDL_INCLUDE_DIRS}
+    ${SDL2_INCLUDE_DIRS}
+    ${SDLGFX_INCLUDE_DIRS}
+    ${SDLMIXER_INCLUDE_DIRS}
+    ${SDLIMAGE_INCLUDE_DIRS}
+    ${SDLTTF_INCLUDE_DIRS}
+    ${SDLNET_INCLUDE_DIRS}
+    ${PNG_INCLUDE_DIRS}
+    ${LZ_INCLUDE_DIRS})
+
+target_link_directories(libswe PUBLIC
+    ${SDL_LIBRARY_DIRS}
+    ${SDL2_LIBRARY_DIRS}
+    ${SDLGFX_LIBRARY_DIRS}
+    ${SDLMIXER_LIBRARY_DIRS}
+    ${SDLIMAGE_LIBRARY_DIRS}
+    ${SDLTTF_LIBRARY_DIRS}
+    ${SDLNET_LIBRARY_DIRS}
+    ${PNG_LIBRARY_DIRS}
+    ${LZ_LIBRARY_DIRS})
+
+# Keep the last pkg-config occurrence so dependent libraries precede their base
+# libraries on linkers that still resolve symbols from left to right.
+list(REVERSE SWE_LINK_LIBRARIES)
+list(REMOVE_DUPLICATES SWE_LINK_LIBRARIES)
+list(REVERSE SWE_LINK_LIBRARIES)
+target_link_libraries(libswe PUBLIC ${SWE_LINK_LIBRARIES})
+
+target_compile_definitions(libswe PUBLIC
+    $<$<BOOL:${SWE_SDL12}>:SWE_SDL12>
+    $<$<BOOL:${SWE_WITH_JSON}>:SWE_WITH_JSON>
+    $<$<BOOL:${SWE_WITH_LUA}>:SWE_WITH_LUA>
+    $<$<BOOL:${SWE_WITH_ICONV}>:SWE_WITH_ICONV>
+    $<$<BOOL:${SWE_WITH_STD_MAP}>:SWE_WITH_STD_MAP>
+    $<$<BOOL:${SWE_DISABLE_AUDIO}>:SWE_DISABLE_AUDIO>
+    $<$<BOOL:${SWE_DISABLE_IMAGE}>:SWE_DISABLE_IMAGE>
+    $<$<BOOL:${SWE_DISABLE_TTF}>:SWE_DISABLE_TTF>
+    $<$<BOOL:${SWE_DISABLE_NETWORK}>:SWE_DISABLE_NETWORK>
+    $<$<BOOL:${SWE_DISABLE_TERMGUI}>:SWE_DISABLE_TERMGUI>
+    $<$<BOOL:${SWE_BUILTIN_ROOTOZOOM2}>:SWE_BUILTIN_ROOTOZOOM2>
+    $<$<BOOL:${SWE_DLOPEN}>:SWE_DLOPEN>)
 
 add_subdirectory(swe)
 set_target_properties(libswe PROPERTIES PREFIX "")
@@ -62,8 +104,10 @@ if(SWE_WITH_LUA)
 	set(SWE_WITH_LUA_PARTY ON)
     else()
         add_compile_options(${LUA_CFLAGS})
-        add_link_options(${LUA_LDFLAGS})
-        link_libraries(${LUA_LIBRARIES})
+        add_link_options(${LUA_LDFLAGS_OTHER})
+        target_include_directories(libswe PUBLIC ${LUA_INCLUDE_DIRS})
+        target_link_directories(libswe PUBLIC ${LUA_LIBRARY_DIRS})
+        target_link_libraries(libswe PUBLIC ${LUA_LIBRARIES})
     endif()
 
     add_compile_options(-DSWE_WITH_LUA)

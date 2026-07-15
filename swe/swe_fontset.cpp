@@ -398,7 +398,7 @@ SWE::FontRenderTTF::FontRenderTTF(const BinaryBuf & buf, size_t fsz, const CharR
 
 SWE::FontRenderTTF::~FontRenderTTF()
 {
-    if(ptr.unique())
+    if(ptr.use_count() == 1)
         FontsCache(this).erase();
 }
 

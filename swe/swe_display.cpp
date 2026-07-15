@@ -1236,7 +1236,7 @@ void SWE::Display::handleFingerTap(const SDL_TouchFingerEvent & ev)
         {
             coords.setRelease(real);
             // generate release
-            DisplayScene::mouseButtonHandle(coords.release(), true);
+            DisplayScene::mouseButtonHandle(coords.release(), false);
 #ifdef ANDROID
             // gesture finger event
             Point delta = coords.press().position() - coords.release().position();
