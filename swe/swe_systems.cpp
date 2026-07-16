@@ -116,7 +116,8 @@ namespace SWE
 
     void LogWrapper::init(const std::string & app, const char* arg0)
     {
-        const std::string directory = Systems::homeDirectory(app);
+        const char* overrideDirectory = Systems::environment("FOUR_WINDS_DIAGNOSTICS_DIR");
+        const std::string directory = overrideDirectory ? overrideDirectory : Systems::homeDirectory(app);
         if(!directory.empty() && !Systems::isDirectory(directory))
             Systems::makeDirectory(directory);
 
@@ -527,7 +528,15 @@ namespace SWE
 
 #if defined(__MINGW32__)
         // escape char '\\'
-        res = dirname2(String::escaped(res));
+        res = String::escaped(res);
+
+        // SDL_GetPrefPath returns the application directory with a trailing
+        // separator. Preserve that final directory instead of treating it as
+        // a filename and returning its parent.
+        const std::string separator = SEPARATOR();
+        if(res.size() >= separator.size() &&
+           res.substr(res.size() - separator.size()) == separator)
+            res.resize(res.size() - separator.size());
 #endif
         return res;
     }

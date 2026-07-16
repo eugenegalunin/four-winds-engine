@@ -325,6 +325,8 @@ protected:
             int			selected;
             int			skipped;
 
+            using ThemeColors::colorBackground;
+            using ThemeColors::colorText;
             virtual ColorIndex	colorBackground(bool selected) const;
             virtual ColorIndex	colorText(bool selected) const;
 

@@ -112,11 +112,13 @@ bool SWE::Engine::init(bool debug)
               ", revision: " << SDL_GetRevision());
 #endif
 
+    DEBUG("[INIT] SDL status=begin flags=" << init_flags);
     if(SDL_Init(init_flags) != 0)
     {
         ERROR("SDL_Init" << ": " << SDL_GetError());
         return false;
     }
+    DEBUG("[INIT] SDL status=ok");
 
 #ifndef SWE_DISABLE_NETWORK
     sdlver1 = SDLNet_Linked_Version();
@@ -124,11 +126,13 @@ bool SWE::Engine::init(bool debug)
     if(sdlver1)
         DEBUG("usage " << "SDL_net" << ", " << "version: " << static_cast<int>(sdlver1->major) << "." << static_cast<int>(sdlver1->minor) << "." << static_cast<int>(sdlver1->patch));
 
+    DEBUG("[INIT] SDL_net status=begin");
     if(SDLNet_Init() < 0)
     {
         ERROR("SDLNet_Init" << ": " << SDL_GetError());
         return false;
     }
+    DEBUG("[INIT] SDL_net status=ok");
 #endif // SWE_DISABLE_NETWORK
 
 #ifndef SWE_DISABLE_IMAGE
@@ -137,11 +141,13 @@ bool SWE::Engine::init(bool debug)
     if(sdlver1)
         DEBUG("usage " << "SDL_image" << ", " << "version: " << static_cast<int>(sdlver1->major) << "." << static_cast<int>(sdlver1->minor) << "." << static_cast<int>(sdlver1->patch));
 
+    DEBUG("[INIT] SDL_image status=begin");
     if(IMG_Init(IMG_INIT_PNG) == 0)
     {
         ERROR("IMG_Init" << ": " << SDL_GetError());
         return false;
     }
+    DEBUG("[INIT] SDL_image status=ok");
 #endif // SWE_DISABLE_IMAGE
 
 #ifndef SWE_DISABLE_TTF
@@ -150,11 +156,13 @@ bool SWE::Engine::init(bool debug)
     if(sdlver1)
         DEBUG("usage " << "SDL_ttf" << ", " << "version: " << static_cast<int>(sdlver1->major) << "." << static_cast<int>(sdlver1->minor) << "." << static_cast<int>(sdlver1->patch));
 
+    DEBUG("[INIT] SDL_ttf status=begin");
     if(TTF_Init() != 0)
     {
         ERROR("TTF_Init" << ": " << SDL_GetError());
 	return false;
     }
+    DEBUG("[INIT] SDL_ttf status=ok");
 #endif // SWE_DISABLE_TTF
 
 #ifndef SWE_DISABLE_AUDIO
@@ -169,14 +177,28 @@ bool SWE::Engine::init(bool debug)
 #else
     int formats = MIX_INIT_MP3|MIX_INIT_OGG|MIX_INIT_MOD|MIX_INIT_MID;
 #endif
+    DEBUG("[INIT] SDL_mixer codecs status=begin formats=" << formats);
     int res = Mix_Init(formats);
 
     if(res != formats)
+    {
         ERROR("MIX_Init" << ": " << Mix_GetError());
+    }
+    else
+    {
+        DEBUG("[INIT] SDL_mixer codecs status=ok");
+    }
 #endif // SDL_VERSION
 
+    DEBUG("[INIT] SDL_mixer audio status=begin frequency=44100 channels=2 chunksize=1024");
     if(0 > Mix_OpenAudio(44100, MIX_DEFAULT_FORMAT, 2, 1024))
+    {
         ERROR("MIX_OpenAudio" << ": " << Mix_GetError());
+    }
+    else
+    {
+        DEBUG("[INIT] SDL_mixer audio status=ok");
+    }
 
 #endif // SWE_DISABLE_AUDIO
 
@@ -190,6 +212,7 @@ bool SWE::Engine::init(bool debug)
     SDL_SetHint(SDL_HINT_RENDER_SCALE_QUALITY, "1");
 #endif
 
+    DEBUG("[INIT] engine status=ok");
     return true;
 }
 
