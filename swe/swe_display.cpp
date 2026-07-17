@@ -62,6 +62,7 @@ namespace SWE
 
         SDL_Renderer*   _renderer = nullptr;
         SDL_Window*     _window = nullptr;
+        bool            fullscreenResizePending = false;
 #endif
         std::recursive_mutex renderLock;
         Texture		displayTexture;
@@ -87,6 +88,7 @@ namespace SWE
         bool		renderInit(const Size &, bool);
         bool		renderReset(SDL_Texture*);
         bool		isRenderAccelerated(void);
+        void            updateScale(void);
         void            renderPresent(void);
         void		renderCopyEx(const Texture &, const Rect &, Texture &, const Rect &, int);
 
@@ -371,6 +373,14 @@ bool SWE::Display::renderInit(const Size & newsz, bool accel)
 
     renderReset(nullptr);
 
+    updateScale();
+
+    DisplayScene::setDirty(false);
+    return true;
+}
+
+void SWE::Display::updateScale(void)
+{
     if(winsz != rendersz)
     {
         float scaleX = rendersz.w / static_cast<float>(winsz.w);
@@ -389,9 +399,6 @@ bool SWE::Display::renderInit(const Size & newsz, bool accel)
         scale.x = 0;
         scale.y = 0;
     }
-
-    DisplayScene::setDirty(false);
-    return true;
 }
 
 void SWE::Display::closeWindow(void)
@@ -957,7 +964,20 @@ bool SWE::Display::handleEvents(void)
                     DEBUG("resize: " << current.window.data1 << ", " << current.window.data2);
 
 		if(SDL_WINDOWEVENT_SIZE_CHANGED == current.window.event)
-                    resizeWindow(Size(current.window.data1, current.window.data2));
+                {
+                    const Size newSize(current.window.data1, current.window.data2);
+                    if(fullscreenResizePending)
+                    {
+                        fullscreenResizePending = false;
+                        winsz = newSize;
+                        updateScale();
+                        DEBUG("fullscreen resized: " << winsz.toString()
+                              << ", render: " << rendersz.toString());
+                        DisplayScene::setDirty(true);
+                    }
+                    else
+                        resizeWindow(newSize);
+                }
                 else
 		if(SDL_WINDOWEVENT_FOCUS_GAINED == current.window.event)
 		    DisplayScene::displayFocusHandle(true);
@@ -1562,12 +1582,17 @@ void SWE::Display::setWindowIcon(const Surface & sf)
 
 bool SWE::Display::setFullscreenMode(bool f)
 {
+    if(isFullscreenWindow() == f)
+        return true;
+
 #if SWE_SDL12
     if(1 == SDL_WM_ToggleFullScreen(SDL_GetVideoSurface()))
         return true;
 #else
-    if(0 == SDL_SetWindowFullscreen(_window, SDL_WINDOW_FULLSCREEN))
+    fullscreenResizePending = true;
+    if(0 == SDL_SetWindowFullscreen(_window, f ? SDL_WINDOW_FULLSCREEN_DESKTOP : 0))
         return true;
+    fullscreenResizePending = false;
 #endif
     ERROR(SDL_GetError());
     return false;

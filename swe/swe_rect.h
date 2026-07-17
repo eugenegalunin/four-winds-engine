@@ -258,10 +258,15 @@ namespace SWE
 
     struct Polygon : Points
     {
+    private:
+        Points          vertices;
+
+    public:
         Polygon() {}
         Polygon(const Points &);
 
-        bool	operator& (const Point &) const;
+	bool	operator& (const Point &) const;
+        const Points &  boundaryVertices(void) const { return vertices; }
     };
 
     Point operator+ (const Point &, const Size &);

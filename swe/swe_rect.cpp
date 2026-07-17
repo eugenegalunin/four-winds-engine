@@ -774,7 +774,7 @@ namespace SWE
         }
     };
 
-    Polygon::Polygon(const Points & v)
+    Polygon::Polygon(const Points & v) : vertices(v)
     {
         for(auto it1 = v.begin(); it1 != v.end(); ++it1)
         {
@@ -791,70 +791,35 @@ namespace SWE
 
     bool Polygon::operator& (const Point & pt) const
     {
-        Rect ar = around();
+        if(vertices.size() < 3 || !(vertices.around() & pt))
+            return false;
 
-        if(ar & pt)
+        bool inside = false;
+        size_t jj = vertices.size() - 1;
+
+        for(size_t ii = 0; ii < vertices.size(); jj = ii++)
         {
-            // check: move up
-            bool intersection = false;
+            const Point & aa = vertices[ii];
+            const Point & bb = vertices[jj];
+            const long long cross =
+                static_cast<long long>(bb.x - aa.x) * (pt.y - aa.y) -
+                static_cast<long long>(bb.y - aa.y) * (pt.x - aa.x);
 
-            for(int y = pt.y - 1; y >= ar.y; --y)
+            if(cross == 0 &&
+               std::min(aa.x, bb.x) <= pt.x && pt.x <= std::max(aa.x, bb.x) &&
+               std::min(aa.y, bb.y) <= pt.y && pt.y <= std::max(aa.y, bb.y))
+                return true;
+
+            if((aa.y > pt.y) != (bb.y > pt.y))
             {
-                if(end() != std::find(begin(), end(), Point(pt.x, y)))
-                {
-                    intersection = true;
-                    break;
-                }
+                const double intersectionX = aa.x +
+                    static_cast<double>(bb.x - aa.x) * (pt.y - aa.y) /
+                    static_cast<double>(bb.y - aa.y);
+                if(pt.x < intersectionX)
+                    inside = !inside;
             }
-
-            if(! intersection)
-                return false;
-
-            // check; move down
-            intersection = false;
-
-            for(int y = pt.y + 1; y <= ar.y + ar.h; ++y)
-            {
-                if(end() != std::find(begin(), end(), Point(pt.x, y)))
-                {
-                    intersection = true;
-                    break;
-                }
-            }
-
-            if(! intersection)
-                return false;
-
-            // check: move left
-            intersection = false;
-
-            for(int x = pt.x - 1; x >= ar.x; --x)
-            {
-                if(end() != std::find(begin(), end(), Point(x, pt.y)))
-                {
-                    intersection = true;
-                    break;
-                }
-            }
-
-            if(! intersection)
-                return false;
-
-            // check: move right
-            intersection = false;
-
-            for(int x = pt.x + 1; x <= ar.x + ar.w; ++x)
-            {
-                if(end() != std::find(begin(), end(), Point(x, pt.y)))
-                {
-                    intersection = true;
-                    break;
-                }
-            }
-
-            return intersection;
         }
 
-        return false;
+        return inside;
     }
 }

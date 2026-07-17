@@ -35,6 +35,8 @@ namespace SWE
         bool bindDomain(const std::string & domain, const std::string & file);
 
         bool setDomain(const std::string & domain);
+        void reset(void);
+        void setLanguage(const std::string & language);
         void setStripContext(char strip);
 
         const char* gettext(const char* str);

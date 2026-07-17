@@ -195,9 +195,11 @@ namespace SWE
             return *pos ? pos : str;
         }
 
-        void setLocale(void)
+        void setLocale(const std::string & value)
         {
-            std::string str = Systems::messageLocale(1);
+            const std::string str = String::toLower(value);
+
+            locale = LOCALE_EN;
 
             if(str == "af" || str == "afrikaans")	locale = LOCALE_AF;
             else if(str == "ar" || str == "arabic")	locale = LOCALE_AR;
@@ -232,6 +234,18 @@ namespace SWE
             else if(str == "tr" || str == "turkish")	locale = LOCALE_TR;
         }
 
+        void setLanguage(const std::string & language)
+        {
+            setLocale(language);
+        }
+
+        void reset(void)
+        {
+            current = nullptr;
+            domains.clear();
+            locale = LOCALE_EN;
+        }
+
         bool bindDomain(const std::string & domain, const BinaryBuf & buf)
         {
             auto dom = domains.insert(std::make_pair(domain, mofile()));
@@ -239,7 +253,7 @@ namespace SWE
             // if inserted
             if(dom.second)
             {
-                setLocale();
+                setLocale(Systems::messageLocale(1));
                 bool res = (*dom.first).second.parse(buf);
 
                 if(res && current == nullptr)
