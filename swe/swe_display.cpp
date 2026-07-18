@@ -509,7 +509,20 @@ bool SWE::Display::renderReset(SDL_Texture* target)
 
 void SWE::Display::renderClear(const Color & cl, Texture & dtx)
 {
+#ifndef SWE_SDL12
+    // A transparent fill while the renderer uses SDL_BLENDMODE_BLEND is a
+    // no-op: it leaves the newly allocated target texture's pixels undefined.
+    // Dynamic text textures then inherit fragments of previously freed GPU
+    // content. A clear must replace every pixel regardless of its alpha.
+    const std::lock_guard<std::recursive_mutex> lock(renderLock);
+    SDL_BlendMode previous = SDL_BLENDMODE_BLEND;
+    SDL_GetRenderDrawBlendMode(_renderer, & previous);
+    SDL_SetRenderDrawBlendMode(_renderer, SDL_BLENDMODE_NONE);
     renderColor(cl, dtx, dtx.rect());
+    SDL_SetRenderDrawBlendMode(_renderer, previous);
+#else
+    renderColor(cl, dtx, dtx.rect());
+#endif
 }
 
 void SWE::Display::renderColor(const Color & cl, Texture & dtx, const Rect & drt)
