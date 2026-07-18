@@ -92,7 +92,7 @@ namespace SWE
 
     int Music::volume(int volume)
     {
-        return Mix_VolumeMusic(0 < volume ? volume % MIX_MAX_VOLUME : volume);
+        return Mix_VolumeMusic(volume > MIX_MAX_VOLUME ? MIX_MAX_VOLUME : volume);
     }
 
     void Music::pause(void)
