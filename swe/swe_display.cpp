@@ -49,6 +49,7 @@ namespace SWE
     namespace Display
     {
         bool            forceWindowed = false;
+        bool            fixedRenderSize = false;
         bool		fingerEventEmulation = false;
         const int       fingerMoveDelta = 4;
 #ifdef ANDROID
@@ -89,6 +90,7 @@ namespace SWE
         bool		renderReset(SDL_Texture*);
         bool		isRenderAccelerated(void);
         void            updateScale(void);
+        void            updateTextureScaleMode(void);
         void            renderPresent(void);
         void		renderCopyEx(const Texture &, const Rect &, Texture &, const Rect &, int);
 
@@ -249,7 +251,25 @@ bool SWE::Display::createWindow(const std::string & title, const Size & newsz, i
 
 bool SWE::Display::resizeWindow(const Size & newsz)
 {
-    if(_window && winsz != newsz)
+    if(!_window)
+        return false;
+
+    if(winsz == newsz)
+        return true;
+
+#ifndef SWE_SDL12
+    if(fixedRenderSize)
+    {
+        DEBUG("new fixed-render window size: " << newsz.toString());
+        SDL_SetWindowSize(_window, newsz.w, newsz.h);
+        SDL_GetWindowSize(_window, &winsz.w, &winsz.h);
+        updateScale();
+        DisplayScene::setDirty(true);
+        return true;
+    }
+#endif
+
+    if(winsz != newsz)
     {
         bool accel = isRenderAccelerated();
         DEBUG("new sz: " << newsz.toString());
@@ -363,6 +383,7 @@ bool SWE::Display::renderInit(const Size & newsz, bool accel)
     }
 
     renderClear(Color::Black, displayTexture);
+    updateTextureScaleMode();
     DEBUG("window: " << winsz.w << "x" << winsz.h);
     DEBUG("render: " << rendersz.w << "x" << rendersz.h);
     DEBUG("render: " << (accel ? "hardware" : "software"));
@@ -381,14 +402,15 @@ bool SWE::Display::renderInit(const Size & newsz, bool accel)
 
 void SWE::Display::updateScale(void)
 {
-    if(winsz != rendersz)
+    if(winsz != rendersz && 0 < winsz.w && 0 < winsz.h &&
+       0 < rendersz.w && 0 < rendersz.h)
     {
-        float scaleX = rendersz.w / static_cast<float>(winsz.w);
-        float scaleY = rendersz.h / static_cast<float>(winsz.h);
-        float factor = scaleY > scaleX ? scaleY : scaleX;
+        const float scaleX = winsz.w / static_cast<float>(rendersz.w);
+        const float scaleY = winsz.h / static_cast<float>(rendersz.h);
+        const float factor = std::min(scaleX, scaleY);
         DEBUG("scale factor: " << factor);
-        scale.w = rendersz.w / factor;
-        scale.h = rendersz.h / factor;
+        scale.w = std::max(1, static_cast<int>(std::round(rendersz.w * factor)));
+        scale.h = std::max(1, static_cast<int>(std::round(rendersz.h * factor)));
         scale.x = (winsz.w - scale.w) / 2;
         scale.y = (winsz.h - scale.h) / 2;
     }
@@ -399,6 +421,16 @@ void SWE::Display::updateScale(void)
         scale.x = 0;
         scale.y = 0;
     }
+}
+
+void SWE::Display::updateTextureScaleMode(void)
+{
+#if !defined(SWE_SDL12) && SDL_VERSION_ATLEAST(2, 0, 12)
+    if(displayTexture.isValid() &&
+       0 != SDL_SetTextureScaleMode(displayTexture.toSDLTexture(),
+                                    SDL_ScaleModeLinear))
+        ERROR("texture scale mode: " << SDL_GetError());
+#endif
 }
 
 void SWE::Display::closeWindow(void)
@@ -976,10 +1008,19 @@ bool SWE::Display::handleEvents(void)
 		if(SDL_WINDOWEVENT_RESIZED == current.window.event)
                     DEBUG("resize: " << current.window.data1 << ", " << current.window.data2);
 
-		if(SDL_WINDOWEVENT_SIZE_CHANGED == current.window.event)
+                if(SDL_WINDOWEVENT_SIZE_CHANGED == current.window.event)
                 {
                     const Size newSize(current.window.data1, current.window.data2);
-                    if(fullscreenResizePending)
+                    if(fixedRenderSize)
+                    {
+                        fullscreenResizePending = false;
+                        winsz = newSize;
+                        updateScale();
+                        DEBUG("fixed render resized: " << winsz.toString()
+                              << ", render: " << rendersz.toString());
+                        DisplayScene::setDirty(true);
+                    }
+                    else if(fullscreenResizePending)
                     {
                         fullscreenResizePending = false;
                         winsz = newSize;
@@ -1625,6 +1666,11 @@ bool SWE::Display::isFullscreenWindow(void)
 #endif
 }
 
+void SWE::Display::setFixedRenderSize(bool f)
+{
+    fixedRenderSize = f;
+}
+
 #if SWE_SDL12
 #if defined(__LINUX__)
 #include <X11/Xlib.h>
@@ -1739,10 +1785,12 @@ SWE::Rect SWE::Display::usableBounds(void)
 #endif
 
 #else
-    if(_window)
+    if(SDL_WasInit(SDL_INIT_VIDEO))
     {
         SDL_Rect res;
-        if(0 == SDL_GetDisplayUsableBounds(0, & res))
+        int displayIndex = _window ? SDL_GetWindowDisplayIndex(_window) : 0;
+        if(displayIndex < 0) displayIndex = 0;
+        if(0 == SDL_GetDisplayUsableBounds(displayIndex, & res))
         {
             return Rect(res);
         }

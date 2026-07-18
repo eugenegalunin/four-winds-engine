@@ -54,6 +54,7 @@ namespace SWE
         bool		setFullscreenMode(bool);
         bool		isFullscreenWindow(void);
         bool            isMaximizedWindow(void);
+        void            setFixedRenderSize(bool);
 
         bool		scaleUsed(void);
         Point		scaleValue(const Point &);
