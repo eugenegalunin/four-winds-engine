@@ -564,6 +564,11 @@ SWE::Size SWE::FontRenderTTF::unicodeSize(const UnicodeString & ustr, bool horiz
     int w = 0;
     int h = 0;
 
+    // A coloured UCString may contain a formatting-only segment whose
+    // Unicode payload is empty. Measuring it is valid and must not call
+    // basic_string::back() on an empty string.
+    if(ustr.empty()) return Size(w, h);
+
     if(isValid())
     {
         if(horizontal)
