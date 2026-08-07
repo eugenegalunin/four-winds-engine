@@ -23,7 +23,7 @@
 #include <ctime>
 #include <cstdlib>
 
-#if (defined(__APPLE__) || defined(__linux__)) && !defined(BOOST_STACKTRACE_USE_ADDR2LINE)
+#if (defined(__APPLE__) || defined(__linux__)) && !defined(ANDROID) && !defined(BOOST_STACKTRACE_USE_ADDR2LINE)
 #include <execinfo.h>
 #endif
 
@@ -53,7 +53,7 @@ namespace SWE
 #include "boost/stacktrace.hpp"
 #endif
 
-#if (defined(__APPLE__) || defined(__linux__)) && !defined(BOOST_STACKTRACE_USE_ADDR2LINE)
+#if (defined(__APPLE__) || defined(__linux__)) && !defined(ANDROID) && !defined(BOOST_STACKTRACE_USE_ADDR2LINE)
 namespace
 {
 void logNativeStackTrace(void)
@@ -83,7 +83,7 @@ void SWE::Engine::except(const char* func, const char* message)
     if(!message || strcmp(message, "SDL_QUIT"))
         LogWrapper() << boost::stacktrace::stacktrace();
 
-#elif defined(__APPLE__) || defined(__linux__)
+#elif (defined(__APPLE__) || defined(__linux__)) && !defined(ANDROID)
     if(!message || strcmp(message, "SDL_QUIT"))
         logNativeStackTrace();
 #endif

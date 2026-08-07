@@ -1,4 +1,6 @@
-include(FindPkgConfig)
+if(NOT ANDROID)
+    include(FindPkgConfig)
+endif()
 
 set(CMAKE_FIND_FRAMEWORK LAST)
 set(SWE_LINK_LIBRARIES)
@@ -33,7 +35,16 @@ if(SWE_EXAMPLES)
     set(SWE_WITH_JSON ON CACHE BOOL "enable builtin json" FORCE)
 endif()
 
-if(SWE_SDL12)
+if(ANDROID)
+    list(APPEND SWE_LINK_LIBRARIES
+        SDL2::SDL2
+        SDL2_image::SDL2_image
+        SDL2_mixer::SDL2_mixer
+        SDL2_ttf::SDL2_ttf
+        z
+        android
+        log)
+elseif(SWE_SDL12)
     pkg_search_module(SDL REQUIRED SDL>=1.2)
     pkg_search_module(SDLGFX REQUIRED SDL_gfx>=2.0)
 
@@ -166,10 +177,12 @@ if(SWE_SDL12)
     list(APPEND SWE_LINK_LIBRARIES ${PNG_LIBRARIES})
 endif()
 
-pkg_search_module(LZ REQUIRED zlib)
-add_compile_options(${LZ_CFLAGS})
-add_link_options(${LZ_LDFLAGS_OTHER})
-list(APPEND SWE_LINK_LIBRARIES ${LZ_LIBRARIES})
+if(NOT ANDROID)
+    pkg_search_module(LZ REQUIRED zlib)
+    add_compile_options(${LZ_CFLAGS})
+    add_link_options(${LZ_LDFLAGS_OTHER})
+    list(APPEND SWE_LINK_LIBRARIES ${LZ_LIBRARIES})
+endif()
 
 if(SWE_DLOPEN)
     add_compile_options(-DSWE_DLOPEN)

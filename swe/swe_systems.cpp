@@ -29,6 +29,7 @@
 #include <cstdlib>
 #include <clocale>
 #include <algorithm>
+#include <set>
 #include <mutex>
 
 #if defined(__MINGW32CE__) || defined(__MINGW32__) || defined(__WIN32__) || defined(__WIN64__)
@@ -290,17 +291,60 @@ namespace SWE
     namespace
     {
         StringList assetsRes;
+
+        std::string normalizedAssetPath(std::string path)
+        {
+            std::replace(path.begin(), path.end(), '\\', '/');
+
+            while(path.size() >= 2 && path[0] == '.' && path[1] == '/')
+                path.erase(0, 2);
+            while(!path.empty() && path.front() == '/')
+                path.erase(path.begin());
+            while(!path.empty() && (path.back() == '/' || path.back() == '\r'))
+                path.pop_back();
+
+            return path;
+        }
+
+#if defined(ANDROID)
+        bool isAssetFile(const std::string & name)
+        {
+            const std::string normalized = normalizedAssetPath(name);
+            return !normalized.empty() &&
+                assetsRes.end() != std::find(assetsRes.begin(), assetsRes.end(), normalized);
+        }
+
+        bool isAssetDirectory(const std::string & name)
+        {
+            const std::string normalized = normalizedAssetPath(name);
+            if(normalized.empty()) return false;
+
+            const std::string prefix = normalized + "/";
+            return std::any_of(assetsRes.begin(), assetsRes.end(),
+                [&](const std::string & asset)
+                {
+                    return asset.compare(0, prefix.size(), prefix) == 0;
+                });
+        }
+#endif
     }
 
     void Systems::assetsInit(void)
     {
         const char* list = "assets.list";
         std::string str;
+        assetsRes.clear();
         Systems::readFile2String(list, str);
 
         if(str.size())
         {
-            assetsRes << String::split(str, 0x0A);
+            std::set<std::string> unique;
+            for(const std::string & item : String::split(str, 0x0A))
+            {
+                const std::string normalized = normalizedAssetPath(item);
+                if(!normalized.empty() && unique.insert(normalized).second)
+                    assetsRes.push_back(normalized);
+            }
             DEBUG("items: " << assetsRes.size());
         }
     }
@@ -314,7 +358,7 @@ namespace SWE
     {
 #if defined(ANDROID)
 
-        if(assetsRes.end() != std::find(assetsRes.begin(), assetsRes.end(), name))
+        if(!writable && isAssetFile(name))
             return true;
 
 #endif
@@ -330,6 +374,13 @@ namespace SWE
     {
         if(name.empty())
             return false;
+
+#if defined(ANDROID)
+
+        if(!writable && isAssetDirectory(name))
+            return true;
+
+#endif
 
 #if defined(__MINGW32__)
 
@@ -545,6 +596,12 @@ namespace SWE
     {
         StringList dirs;
 #if defined(ANDROID)
+        // APK assets do not have real filesystem directories. An empty root
+        // lets callers resolve "themes" through the manifest-backed virtual
+        // directory functions below, while writable storage remains available
+        // for user content and future mod packages.
+        if(isAssetDirectory("themes")) dirs.push_back("");
+
         const char* internal = SDL_AndroidGetInternalStoragePath();
 
         if(internal) dirs.push_back(Systems::concatePath(internal, prog));
@@ -593,6 +650,22 @@ namespace SWE
 
     StringList Systems::findFiles(const std::string & path, const std::string & filter, bool sensitive)
     {
+#if defined(ANDROID)
+        if(isAssetDirectory(path))
+        {
+            StringList res;
+            const std::string normalized = normalizedAssetPath(path);
+            const std::string prefix = normalized + "/";
+
+            for(const std::string & asset : assetsRes)
+            {
+                if(asset.compare(0, prefix.size(), prefix) != 0) continue;
+                if(filter.empty() || findFilterContent(Systems::basename(asset), filter, sensitive))
+                    res.push_back(asset);
+            }
+            return res;
+        }
+#endif
 #if defined(__MINGW32__)
 
         if(path.back() == ':')
@@ -634,6 +707,28 @@ namespace SWE
 
     StringList Systems::readDir(const std::string & path, bool fullpath)
     {
+#if defined(ANDROID)
+        if(isAssetDirectory(path))
+        {
+            StringList res;
+            std::set<std::string> children;
+            const std::string normalized = normalizedAssetPath(path);
+            const std::string prefix = normalized + "/";
+
+            for(const std::string & asset : assetsRes)
+            {
+                if(asset.compare(0, prefix.size(), prefix) != 0) continue;
+                const std::string remainder = asset.substr(prefix.size());
+                const size_t separator = remainder.find('/');
+                const std::string child = remainder.substr(0, separator);
+                if(!child.empty()) children.insert(child);
+            }
+
+            for(const std::string & child : children)
+                res.push_back(fullpath ? Systems::concatePath(normalized, child) : child);
+            return res;
+        }
+#endif
 #if defined(__MINGW32__)
 
         if(path.back() == ':')

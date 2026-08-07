@@ -1040,6 +1040,29 @@ bool SWE::Display::handleEvents(void)
 		    DisplayScene::displayFocusHandle(false);
                 break;
 
+#ifdef ANDROID
+            case SDL_APP_WILLENTERBACKGROUND:
+                Music::pause();
+                Sound::pause(-1);
+                DisplayScene::displayFocusHandle(false);
+                break;
+
+            case SDL_APP_DIDENTERFOREGROUND:
+                DisplayScene::displayFocusHandle(true);
+                Music::resume();
+                Sound::resume(-1);
+                DisplayScene::setDirty(true);
+                break;
+
+            case SDL_RENDER_TARGETS_RESET:
+            case SDL_RENDER_DEVICE_RESET:
+                // SDL has restored the Android renderer after a surface/context
+                // loss. Scene resources are retained by SDL where possible;
+                // force a complete redraw before accepting the next input.
+                DisplayScene::setDirty(true);
+                break;
+#endif
+
             case SDL_TEXTINPUT:
                 handleTextInput(current.text);
                 break;
