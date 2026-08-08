@@ -83,6 +83,7 @@ namespace SWE
         bool       		isPressed(void) const;
         bool        		isReleased(void) const;
         bool        		isHotKey(int) const;
+        bool                    isAreaPoint(const Point &) const override;
 
         int         		action(void) const;
         int         		hotKey(void) const;

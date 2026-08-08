@@ -26,6 +26,8 @@
 #include "swe_wingui.h"
 #include "swe_wingui_button.h"
 
+#include <algorithm>
+
 namespace SWE
 {
     /* WindowButton */
@@ -290,6 +292,34 @@ namespace SWE
     bool WindowButton::isHotKey(int val) const
     {
         return hotKey() == val;
+    }
+
+    bool WindowButton::isAreaPoint(const Point & pt) const
+    {
+#ifdef ANDROID
+        // The game renders into a 1024x768 logical canvas. On a phone, several
+        // legacy icon buttons are therefore visually clear but have a very
+        // small physical hit target. Keep their artwork and layout untouched,
+        // while allowing a modest amount of touch slop around small buttons.
+        // The cap prevents neighbouring controls from acquiring large,
+        // ambiguous overlapping hit areas.
+        constexpr int minimumTouchExtent = 44;
+        constexpr int maximumTouchPadding = 6;
+
+        const int missingWidth = minimumTouchExtent - width();
+        const int missingHeight = minimumTouchExtent - height();
+        const int horizontalPadding = missingWidth > 0 ?
+            std::min(maximumTouchPadding, (missingWidth + 1) / 2) : 0;
+        const int verticalPadding = missingHeight > 0 ?
+            std::min(maximumTouchPadding, (missingHeight + 1) / 2) : 0;
+        const Rect touchArea(position().x - horizontalPadding,
+                             position().y - verticalPadding,
+                             width() + horizontalPadding * 2,
+                             height() + verticalPadding * 2);
+        return touchArea & pt;
+#else
+        return Window::isAreaPoint(pt);
+#endif
     }
 
     int WindowButton::hotKey(void) const
